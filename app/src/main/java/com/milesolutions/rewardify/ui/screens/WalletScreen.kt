@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,18 +60,25 @@ import com.milesolutions.rewardify.ui.theme.Indigo100
 import com.milesolutions.rewardify.ui.theme.Indigo700
 import com.milesolutions.rewardify.ui.theme.Indigo800
 import com.milesolutions.rewardify.ui.theme.Indigo900
+import kotlinx.coroutines.launch
 
 @Composable
 fun WalletScreen(tabNavController: NavController) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showWithdraw by remember { mutableStateOf(false) }
     var showRedeem by remember { mutableStateOf(false) }
+    var isWithdrawing by remember { mutableStateOf(false) }
 
     // Real earnings ledger (falls back to demo data until the referral
-    // backend is set up / the user has earnings).
+    // backend is set up / the user has earnings). Every earning event —
+    // tasks, bonuses, referral commissions, withdrawals — lives in the
+    // Supabase earnings table, so logging out, reinstalling, or switching
+    // phones and signing back in restores the exact same balance/history.
     var ledgerBalance by remember { mutableStateOf<Double?>(null) }
     var ledgerTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
-    LaunchedEffect(Unit) {
+
+    suspend fun refreshLedger() {
         runCatching { ReferralRepository.getMyEarnings() }.onSuccess { rows ->
             if (rows.isNotEmpty()) {
                 ledgerBalance = rows.sumOf { it.amount }
@@ -85,6 +93,7 @@ fun WalletScreen(tabNavController: NavController) {
             }
         }
     }
+    LaunchedEffect(Unit) { refreshLedger() }
     val displayBalance = ledgerBalance ?: FakeRepository.availableBalance
     val displayLifetime = ledgerBalance ?: FakeRepository.lifetimeEarned
     val displayTransactions =
@@ -97,10 +106,28 @@ fun WalletScreen(tabNavController: NavController) {
             onDismiss = { showWithdraw = false },
             onConfirm = { amount ->
                 showWithdraw = false
-                // TODO: call withdraw API, then refresh balance
-                context.showToast(
-                    "Withdrawal of $${"%.2f".format(amount)} requested ✓"
-                )
+                scope.launch {
+                    isWithdrawing = true
+                    val result = runCatching {
+                        ReferralRepository.recordWithdrawal(
+                            amount,
+                            "Withdrawal requested from wallet"
+                        )
+                    }
+                    isWithdrawing = false
+                    result
+                        .onSuccess {
+                            context.showToast(
+                                "Withdrawal of $${"%.2f".format(amount)} recorded ✓"
+                            )
+                            refreshLedger()
+                        }
+                        .onFailure { e ->
+                            context.showToast(
+                                "Withdrawal failed: ${e.message?.take(80) ?: "try again"}"
+                            )
+                        }
+                }
             }
         )
     }
@@ -194,7 +221,7 @@ fun WalletScreen(tabNavController: NavController) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White)
-                                .clickable { showWithdraw = true }
+                                .clickable(enabled = !isWithdrawing) { showWithdraw = true }
                                 .padding(vertical = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {

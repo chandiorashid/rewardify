@@ -115,8 +115,15 @@ How it works:
 - **Completing a task** now records a real earning: tap a task → Start →
   confirm "Complete task?" → the amount is logged and the referrer's 5% is
   paid instantly.
+- **Withdrawals are tracked too:** confirming a withdrawal writes a negative
+  `withdrawal` row into the same ledger (via `supabase/withdrawal_schema.sql`),
+  so the balance drops and the withdrawal shows in Supabase and in the app's
+  transaction history. The server refuses withdrawals above the balance.
 - The Wallet balance and Recent transactions read from the real ledger once
   earnings exist (demo values are shown until then).
+- **Everything is server-side:** the ledger lives in Supabase keyed by account,
+  so logging out, deleting the app, or moving to a new phone and signing back
+  in restores the exact same balance, earnings and referral data.
 
 ## App logic included
 
@@ -124,7 +131,8 @@ How it works:
   password-match checks with toast feedback; forgot-password and social buttons
   show contextual toasts.
 - **Withdraw dialog** — amount entry with validation (valid number, $5.00 minimum,
-  sufficient balance) and a success toast on confirmation. Available on Home and Wallet.
+  sufficient balance); confirming writes a real `withdrawal` entry to the
+  Supabase earnings ledger and refreshes the balance. Available on Home and Wallet.
 - **Gift-card redemption dialog** — code validation with a success toast.
 - **Tasks** — category tabs filter the list; tapping a Home category tile opens
   Tasks pre-filtered to that category; confirming "Complete task?" records a
@@ -136,8 +144,8 @@ How it works:
 
 - **Demo data, mostly.** `FakeRepository` holds sample tasks, balances and
   transactions. Auth is real (Supabase), and the referral system + earnings
-  ledger are real once you run `supabase/referral_schema.sql` (see above).
-  Task catalog content itself is still sample data.
+  ledger (including withdrawals) are real — the SQL files in `supabase/` are
+  already deployed. Task catalog content itself is still sample data.
 - **TODO markers** in the code flag the natural next steps: task details,
-  withdraw flow, payout methods, notifications, search/filters, settings.
+  payout methods, notifications, search/filters, settings.
 - Social buttons (Google/Apple) are UI placeholders — connect real OAuth later.

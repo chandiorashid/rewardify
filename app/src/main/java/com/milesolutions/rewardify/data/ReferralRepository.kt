@@ -132,4 +132,20 @@ object ReferralRepository {
             }
         )
     }
+
+    /**
+     * Records a withdrawal for the signed-in user. The server writes a
+     * negative 'withdrawal' row into the earnings ledger, so the balance
+     * drops and the withdrawal is tracked in Supabase like every other
+     * earning event. Throws when the balance doesn't cover [amount].
+     */
+    suspend fun recordWithdrawal(amount: Double, note: String) {
+        postgrest.rpc(
+            function = "record_withdrawal",
+            parameters = buildJsonObject {
+                put("p_amount", amount)
+                put("p_note", note)
+            }
+        )
+    }
 }
