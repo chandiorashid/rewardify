@@ -6,11 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.milesolutions.rewardify.data.AuthRepository
+import com.milesolutions.rewardify.data.EnsureProfileResult
+import com.milesolutions.rewardify.data.ReferralPrefs
+import com.milesolutions.rewardify.data.ReferralRepository
 import com.milesolutions.rewardify.data.Supabase
 import com.milesolutions.rewardify.data.SupabaseConfig
 import com.milesolutions.rewardify.ui.components.showToast
@@ -28,8 +34,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Cold start via the email-confirmation deep link.
-        handleAuthDeepLink(intent)
+        // Cold start via a deep link (email confirmation or referral link).
+        handleDeepLink(intent)
         setContent {
             RewardifyTheme {
                 RewardifyApp()
@@ -39,26 +45,42 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // App already running (singleTask): the confirmation link arrives here.
-        handleAuthDeepLink(intent)
+        // App already running (singleTask): deep links arrive here.
+        handleDeepLink(intent)
     }
 
     /**
-     * Imports the Supabase session when the activity is opened with the
-     * email-confirmation deep link. No-op for normal launches.
+     * Routes incoming deep links:
+     * - auth-callback -> Supabase email-confirmation handling
+     * - referral      -> captures the referral code for the signup screen
+     * No-op for normal launches.
      */
     @OptIn(SupabaseInternal::class)
-    private fun handleAuthDeepLink(intent: Intent?) {
-        if (intent == null || !SupabaseConfig.isConfigured) return
-        Supabase.client.handleDeeplinks(
-            intent,
-            onSessionSuccess = {
-                showToast("Email verified — welcome to Rewardify! 🎉")
-            },
-            onError = { error ->
-                showToast(error.message ?: "Could not verify your email. Please try again.")
+    private fun handleDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != Supabase.AUTH_SCHEME || !SupabaseConfig.isConfigured) return
+        when (uri.host) {
+            Supabase.AUTH_HOST -> Supabase.client.handleDeeplinks(
+                intent,
+                onSessionSuccess = {
+                    showToast("Email verified — welcome to Rewardify! 🎉")
+                },
+                onError = { error ->
+                    showToast(error.message ?: "Could not verify your email. Please try again.")
+                }
+            )
+
+            Supabase.REFERRAL_HOST -> {
+                val code = uri.getQueryParameter("code")?.trim().orEmpty()
+                if (code.isEmpty()) return
+                if (AuthRepository.isLoggedIn()) {
+                    showToast("You're already a member — share your own code to earn 5% on referrals!")
+                } else {
+                    ReferralPrefs.savePendingCode(this, code)
+                    showToast("Referral code $code applied — sign up to get your \$0.20 bonus 🎁")
+                }
             }
-        )
+        }
     }
 }
 
@@ -91,7 +113,28 @@ private fun RewardifyApp() {
 
     when (effectiveStatus) {
         is SessionStatus.Initializing -> SplashScreen()
-        is SessionStatus.Authenticated -> MainRoot()
+        is SessionStatus.Authenticated -> {
+            // First thing after any sign-in: make sure the user has a
+            // referral profile (idempotent — existing users are untouched).
+            // This also credits the $0.20 bonus for referred signups.
+            val context = LocalContext.current
+            val userId = AuthRepository.currentUserId()
+            LaunchedEffect(userId) {
+                val result = runCatching {
+                    ReferralRepository.ensureProfile(context.applicationContext)
+                }.getOrNull()
+                when (result) {
+                    is EnsureProfileResult.Registered -> when {
+                        result.bonusCredited ->
+                            context.showToast("Referral bonus: \$0.20 added to your wallet! 🎁")
+                        result.invalidCode ->
+                            context.showToast("That referral code wasn't recognized — no bonus applied.")
+                    }
+                    else -> Unit
+                }
+            }
+            MainRoot()
+        }
         is SessionStatus.NotAuthenticated,
         is SessionStatus.RefreshFailure -> AuthNavHost()
     }

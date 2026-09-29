@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import com.milesolutions.rewardify.ui.screens.HomeScreen
 import com.milesolutions.rewardify.ui.screens.LoginScreen
 import com.milesolutions.rewardify.ui.screens.ProfileScreen
+import com.milesolutions.rewardify.ui.screens.ReferralScreen
 import com.milesolutions.rewardify.ui.screens.SignupScreen
 import com.milesolutions.rewardify.ui.screens.TasksScreen
 import com.milesolutions.rewardify.ui.screens.WalletScreen
@@ -87,6 +88,9 @@ fun MainScreen(rootNavController: NavHostController) {
                 )
             }
             composable("wallet") { WalletScreen(tabNavController = tabNavController) }
+            // Referral hub: opened from Profile ("Refer & earn") and the Home
+            // promo card. Not a bottom tab — reached via explicit navigation.
+            composable("referral") { ReferralScreen(tabNavController = tabNavController) }
             composable("profile") {
                 ProfileScreen(
                     tabNavController = tabNavController,

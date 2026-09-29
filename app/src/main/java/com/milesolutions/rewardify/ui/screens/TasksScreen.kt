@@ -21,12 +21,15 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,12 +39,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.milesolutions.rewardify.data.FakeRepository
+import com.milesolutions.rewardify.data.ReferralRepository
 import com.milesolutions.rewardify.data.TaskCategory
+import com.milesolutions.rewardify.data.TaskItem
 import com.milesolutions.rewardify.ui.components.TaskCard
 import com.milesolutions.rewardify.ui.components.showToast
 import com.milesolutions.rewardify.ui.theme.Gray500
 import com.milesolutions.rewardify.ui.theme.Gray900
 import com.milesolutions.rewardify.ui.theme.Indigo700
+import kotlinx.coroutines.launch
 
 @Composable
 fun TasksScreen(
@@ -49,10 +55,50 @@ fun TasksScreen(
     initialCategory: TaskCategory = TaskCategory.ALL
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedTab by remember(initialCategory) { mutableStateOf(initialCategory) }
     val tabs = TaskCategory.values().toList()
     val visibleTasks = FakeRepository.tasks.filter {
         selectedTab == TaskCategory.ALL || it.category == selectedTab
+    }
+    // Task awaiting completion confirmation. Confirming records the earning
+    // in the ledger — and automatically pays 5% to the user's referrer.
+    var pendingTask by remember { mutableStateOf<TaskItem?>(null) }
+    var recording by remember { mutableStateOf(false) }
+
+    pendingTask?.let { task ->
+        AlertDialog(
+            onDismissRequest = { if (!recording) pendingTask = null },
+            title = { Text("Complete task?") },
+            text = {
+                Text("Mark \"${task.title}\" as complete to earn \$${"%.2f".format(task.reward)}.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            recording = true
+                            val ok = runCatching {
+                                ReferralRepository.recordTaskEarning(task.reward, task.title)
+                            }.isSuccess
+                            recording = false
+                            pendingTask = null
+                            context.showToast(
+                                if (ok) "Earned \$${"%.2f".format(task.reward)}! 🎉"
+                                else "Couldn't record the earning — check your connection and try again."
+                            )
+                        }
+                    },
+                    enabled = !recording
+                ) { Text(if (recording) "Saving…" else "Complete") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingTask = null },
+                    enabled = !recording
+                ) { Text("Cancel") }
+            }
+        )
     }
 
     Column(
@@ -121,11 +167,7 @@ fun TasksScreen(
             items(visibleTasks, key = { it.id }) { task ->
                 TaskCard(
                     task = task,
-                    onStart = {
-                        // TODO: open task detail / tracking screen
-                        val verb = if (task.progress != null) "Continuing" else "Starting"
-                        context.showToast("$verb: ${task.title}")
-                    }
+                    onStart = { pendingTask = task }
                 )
             }
             item { Spacer(modifier = Modifier.height(12.dp)) }

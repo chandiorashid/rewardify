@@ -38,6 +38,9 @@ object AuthRepository {
     fun isLoggedIn(): Boolean =
         Supabase.client.auth.currentUserOrNull() != null
 
+    fun currentUserId(): String? =
+        Supabase.client.auth.currentUserOrNull()?.id
+
     fun currentEmail(): String? =
         Supabase.client.auth.currentUserOrNull()?.email
 

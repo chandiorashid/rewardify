@@ -192,6 +192,60 @@ fun HomeScreen(tabNavController: NavController) {
             Spacer(modifier = Modifier.height(10.dp))
         }
 
+        // Referral promo
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { tabNavController.navigate("referral") },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Emerald100),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = rewardifyIcon("card_giftcard"),
+                            contentDescription = null,
+                            tint = Emerald700,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Invite friends, earn 5% for life",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Gray900
+                        )
+                        Text(
+                            text = "They get a \$0.20 welcome bonus",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Gray500
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = Gray500
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         // Categories
         item {
             SectionTitle("Earning categories")

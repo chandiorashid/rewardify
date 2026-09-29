@@ -2,6 +2,7 @@ package com.milesolutions.rewardify.data
 
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.postgrest.Postgrest
 
 /**
  * Shared Supabase client (Auth plugin installed). Created lazily on first use.
@@ -23,6 +24,16 @@ object Supabase {
     const val AUTH_HOST = "auth-callback"
     const val AUTH_REDIRECT_URL = "$AUTH_SCHEME://$AUTH_HOST"
 
+    /**
+     * Referral deep links look like `com.milesolutions.rewardify://referral?code=ABC123`.
+     * Tapping one (with the app installed) opens the app and pre-fills the
+     * code on the signup screen. Must match the intent-filter in
+     * AndroidManifest.xml.
+     */
+    const val REFERRAL_HOST = "referral"
+
+    fun referralLink(code: String): String = "$AUTH_SCHEME://$REFERRAL_HOST?code=$code"
+
     val client by lazy {
         createSupabaseClient(
             supabaseUrl = SupabaseConfig.SUPABASE_URL,
@@ -33,6 +44,7 @@ object Supabase {
                 host = AUTH_HOST
                 defaultRedirectUrl = AUTH_REDIRECT_URL
             }
+            install(Postgrest)
         }
     }
 }

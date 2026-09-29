@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -41,6 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.milesolutions.rewardify.data.ReferralPrefs
+import com.milesolutions.rewardify.data.ReferralRepository
 import com.milesolutions.rewardify.ui.auth.AuthViewModel
 import com.milesolutions.rewardify.ui.components.PrimaryButton
 import com.milesolutions.rewardify.ui.components.RewardifyLogo
@@ -62,6 +65,8 @@ fun SignupScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    // Pre-filled when the user arrived via a referral link.
+    var referralCode by remember { mutableStateOf(ReferralPrefs.getPendingCode(context) ?: "") }
     var agreed by remember { mutableStateOf(false) }
     val authState = authViewModel.uiState
 
@@ -103,7 +108,15 @@ fun SignupScreen(
                 context.showToast("Passwords do not match")
             !agreed ->
                 context.showToast("Please accept the Terms of Service to continue")
-            else -> authViewModel.signup(name, email, password)
+            else -> {
+                // Persist the code now — after signup there may be no session
+                // yet (email confirmation), and the profile is registered on
+                // first sign-in.
+                val code = referralCode.trim()
+                if (code.isNotEmpty()) ReferralPrefs.savePendingCode(context, code)
+                else ReferralPrefs.clearPendingCode(context)
+                authViewModel.signup(name, email, password)
+            }
         }
     }
 
@@ -173,6 +186,23 @@ fun SignupScreen(
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
+
+        Spacer(modifier = Modifier.height(14.dp))
+        RewardifyTextField(
+            value = referralCode,
+            onValueChange = { referralCode = it.uppercase().filter { c -> c.isLetterOrDigit() } },
+            label = "Referral code (optional)",
+            leadingIcon = Icons.Filled.CardGiftcard,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+        )
+        if (referralCode.isNotBlank()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "You'll get a \$${"%.2f".format(ReferralRepository.SIGNUP_BONUS)} welcome bonus 🎁",
+                style = MaterialTheme.typography.bodySmall,
+                color = Emerald600
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {

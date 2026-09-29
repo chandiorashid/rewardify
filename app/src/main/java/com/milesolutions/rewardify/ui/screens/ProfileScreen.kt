@@ -171,6 +171,8 @@ fun ProfileScreen(
                                 .clickable {
                                     if (item.isDestructive) {
                                         onLogout()
+                                    } else if (item.label == "Refer & earn") {
+                                        tabNavController.navigate("referral")
                                     } else {
                                         // TODO: navigate to each profile section
                                         context.showToast("${item.label} coming soon")

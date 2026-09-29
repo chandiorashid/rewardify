@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -65,10 +66,11 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.0")
 
-    // Supabase (auth)
+    // Supabase (auth + database)
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.8.0")
     implementation(supabaseBom)
     implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -86,6 +86,38 @@ be able to log anyone in until you complete these steps:
 That is everything needed from your side — no other config, no extra libraries.
 Until the keys are pasted, the app shows a toast saying Supabase is not configured.
 
+## Referral system setup (required for referrals & earnings)
+
+The referral system (5% lifetime commission + $0.20 signup bonus) needs three
+database tables/functions. This is a one-time, one-minute step:
+
+1. In the Supabase dashboard open the **SQL Editor → New query**.
+2. Open the file `supabase/referral_schema.sql` from this repo, copy its entire
+   contents, paste into the query editor and press **Run**.
+3. Done — no errors means the backend is live.
+
+How it works:
+
+- **Every user gets a unique referral code**, generated server-side on first
+  sign-in (existing accounts get one automatically too).
+- **Newcomer bonus:** signing up with a referral code (typed in, or via a
+  referral link like `com.milesolutions.rewardify://referral?code=ABC123`)
+  credits the new user **$0.20** immediately after their first sign-in.
+- **Lifetime 5% commission:** every earning is tracked in the `earnings` ledger.
+  When a referred user completes a task, the server automatically pays
+  **5% of that earning to the referrer — forever**. Commissions land in the
+  referrer's wallet automatically and appear on the Refer & Earn screen and in
+  Wallet → Recent transactions.
+- Commissions are calculated on **task earnings only** (not on bonuses).
+- **Refer & Earn screen** (Profile → "Refer & earn", or the Home promo card):
+  shows your code, copy/share buttons, total referrals, lifetime referral
+  earnings, how-it-works steps, and a per-referral breakdown.
+- **Completing a task** now records a real earning: tap a task → Start →
+  confirm "Complete task?" → the amount is logged and the referrer's 5% is
+  paid instantly.
+- The Wallet balance and Recent transactions read from the real ledger once
+  earnings exist (demo values are shown until then).
+
 ## App logic included
 
 - **Login/Signup validation** — empty-field, email-format, password-length and
@@ -95,15 +127,17 @@ Until the keys are pasted, the app shows a toast saying Supabase is not configur
   sufficient balance) and a success toast on confirmation. Available on Home and Wallet.
 - **Gift-card redemption dialog** — code validation with a success toast.
 - **Tasks** — category tabs filter the list; tapping a Home category tile opens
-  Tasks pre-filtered to that category; Start/Continue buttons show toasts.
+  Tasks pre-filtered to that category; confirming "Complete task?" records a
+  real earning in the ledger (and pays the 5% referrer commission).
 - **Toast feedback** on notifications, search, filters, history, payout methods,
   profile menu items and logout.
 
 ## Notes
 
-- **Demo data only.** `FakeRepository` holds sample tasks, balances and transactions.
-  Login/Signup accept any input and jump straight into the app. Wire these to a
-  real backend (e.g. Retrofit + your API) when ready.
+- **Demo data, mostly.** `FakeRepository` holds sample tasks, balances and
+  transactions. Auth is real (Supabase), and the referral system + earnings
+  ledger are real once you run `supabase/referral_schema.sql` (see above).
+  Task catalog content itself is still sample data.
 - **TODO markers** in the code flag the natural next steps: task details,
   withdraw flow, payout methods, notifications, search/filters, settings.
 - Social buttons (Google/Apple) are UI placeholders — connect real OAuth later.

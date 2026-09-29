@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +43,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.milesolutions.rewardify.data.EarningRow
 import com.milesolutions.rewardify.data.FakeRepository
+import com.milesolutions.rewardify.data.ReferralRepository
+import com.milesolutions.rewardify.data.Transaction
 import com.milesolutions.rewardify.ui.components.RedeemDialog
 import com.milesolutions.rewardify.ui.components.SectionTitle
 import com.milesolutions.rewardify.ui.components.TransactionRow
@@ -62,9 +66,34 @@ fun WalletScreen(tabNavController: NavController) {
     var showWithdraw by remember { mutableStateOf(false) }
     var showRedeem by remember { mutableStateOf(false) }
 
+    // Real earnings ledger (falls back to demo data until the referral
+    // backend is set up / the user has earnings).
+    var ledgerBalance by remember { mutableStateOf<Double?>(null) }
+    var ledgerTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        runCatching { ReferralRepository.getMyEarnings() }.onSuccess { rows ->
+            if (rows.isNotEmpty()) {
+                ledgerBalance = rows.sumOf { it.amount }
+                ledgerTransactions = rows.take(10).map { e ->
+                    Transaction(
+                        id = e.id,
+                        title = earningTitle(e),
+                        date = earningDateLabel(e.created_at),
+                        amount = e.amount
+                    )
+                }
+            }
+        }
+    }
+    val displayBalance = ledgerBalance ?: FakeRepository.availableBalance
+    val displayLifetime = ledgerBalance ?: FakeRepository.lifetimeEarned
+    val displayTransactions =
+        if (ledgerTransactions.isNotEmpty()) ledgerTransactions
+        else FakeRepository.transactions
+
     if (showWithdraw) {
         WithdrawDialog(
-            availableBalance = FakeRepository.availableBalance,
+            availableBalance = displayBalance,
             onDismiss = { showWithdraw = false },
             onConfirm = { amount ->
                 showWithdraw = false
@@ -140,7 +169,7 @@ fun WalletScreen(tabNavController: NavController) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "$${"%.2f".format(FakeRepository.availableBalance)}",
+                            text = "$${"%.2f".format(displayBalance)}",
                             style = MaterialTheme.typography.displaySmall,
                             color = Color.White,
                             fontWeight = FontWeight.Bold
@@ -156,7 +185,7 @@ fun WalletScreen(tabNavController: NavController) {
                             )
                             BalanceStat(
                                 label = "Lifetime earned",
-                                value = "$${"%.2f".format(FakeRepository.lifetimeEarned)}"
+                                value = "$${"%.2f".format(displayLifetime)}"
                             )
                         }
                         Spacer(modifier = Modifier.height(18.dp))
@@ -217,9 +246,9 @@ fun WalletScreen(tabNavController: NavController) {
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
-                    FakeRepository.transactions.forEachIndexed { index, tx ->
+                    displayTransactions.forEachIndexed { index, tx ->
                         TransactionRow(tx = tx)
-                        if (index < FakeRepository.transactions.lastIndex) {
+                        if (index < displayTransactions.lastIndex) {
                             HorizontalDivider(color = Gray100)
                         }
                     }
@@ -227,6 +256,26 @@ fun WalletScreen(tabNavController: NavController) {
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
+    }
+}
+
+/** Human-readable label for a ledger row. */
+private fun earningTitle(e: EarningRow): String = when (e.source) {
+    "task" -> e.note?.takeIf { it.isNotBlank() } ?: "Task completed"
+    "signup_bonus" -> "Referral welcome bonus"
+    "referral_commission" -> "Referral commission (5%)"
+    "withdrawal" -> "Withdrawal"
+    else -> e.note?.takeIf { it.isNotBlank() } ?: "Adjustment"
+}
+
+/** "2026-09-29T10:24:00+00:00" -> "Sep 29". */
+private fun earningDateLabel(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    return try {
+        java.time.OffsetDateTime.parse(iso).toLocalDate()
+            .format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))
+    } catch (_: Exception) {
+        iso.take(10)
     }
 }
 
