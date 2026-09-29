@@ -28,10 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +42,6 @@ import com.milesolutions.rewardify.data.FakeRepository
 import com.milesolutions.rewardify.ui.components.RewardifyLogo
 import com.milesolutions.rewardify.ui.components.SectionTitle
 import com.milesolutions.rewardify.ui.components.TaskCard
-import com.milesolutions.rewardify.ui.components.WithdrawDialog
 import com.milesolutions.rewardify.ui.components.rewardifyIcon
 import com.milesolutions.rewardify.ui.components.showToast
 import com.milesolutions.rewardify.ui.theme.Emerald100
@@ -61,21 +56,6 @@ import com.milesolutions.rewardify.ui.theme.Indigo900
 @Composable
 fun HomeScreen(tabNavController: NavController) {
     val context = LocalContext.current
-    var showWithdraw by remember { mutableStateOf(false) }
-
-    if (showWithdraw) {
-        WithdrawDialog(
-            availableBalance = FakeRepository.availableBalance,
-            onDismiss = { showWithdraw = false },
-            onConfirm = { amount ->
-                showWithdraw = false
-                // TODO: call withdraw API, then refresh balance
-                context.showToast(
-                    "Withdrawal of $${"%.2f".format(amount)} requested ✓"
-                )
-            }
-        )
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -175,7 +155,10 @@ fun HomeScreen(tabNavController: NavController) {
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
                                 color = Color.White,
-                                modifier = Modifier.clickable { showWithdraw = true }
+                                // Real withdraw flow lives in Wallet.
+                                modifier = Modifier.clickable {
+                                    tabNavController.navigate("wallet")
+                                }
                             ) {
                                 Text(
                                     text = "Withdraw",

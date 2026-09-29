@@ -62,10 +62,13 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.milesolutions.rewardify.data.TaskItem
 import com.milesolutions.rewardify.data.Transaction
+import com.milesolutions.rewardify.ui.theme.Danger100
+import com.milesolutions.rewardify.ui.theme.Danger500
 import com.milesolutions.rewardify.ui.theme.Emerald100
 import com.milesolutions.rewardify.ui.theme.Emerald600
 import com.milesolutions.rewardify.ui.theme.Emerald700
 import com.milesolutions.rewardify.ui.theme.Gold400
+import com.milesolutions.rewardify.ui.theme.Gold500
 import com.milesolutions.rewardify.ui.theme.Gold600
 import com.milesolutions.rewardify.ui.theme.Gray200
 import com.milesolutions.rewardify.ui.theme.Gray500
@@ -326,7 +329,18 @@ fun TransactionRow(tx: Transaction, modifier: Modifier = Modifier) {
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = tx.title, style = MaterialTheme.typography.titleMedium, color = Gray900)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = tx.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Gray900,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (tx.status != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    WithdrawalStatusPill(tx.status)
+                }
+            }
             Text(text = tx.date, style = MaterialTheme.typography.bodySmall, color = Gray500)
         }
         Text(
@@ -334,6 +348,30 @@ fun TransactionRow(tx: Transaction, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = if (isCredit) Emerald600 else Gray500
+        )
+    }
+}
+
+/** Small colored badge for a withdrawal's payout status. */
+@Composable
+fun WithdrawalStatusPill(status: String) {
+    val (bg, fg, label) = when (status) {
+        "paid" -> Triple(Emerald100, Emerald700, "Received")
+        "rejected" -> Triple(Danger100, Danger500, "Rejected")
+        else -> Triple(Gold500.copy(alpha = 0.16f), Gold600, "Pending")
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = fg
         )
     }
 }

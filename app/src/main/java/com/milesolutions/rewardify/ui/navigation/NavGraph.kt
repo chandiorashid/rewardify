@@ -19,6 +19,7 @@ import com.milesolutions.rewardify.ui.components.showToast
 import kotlinx.coroutines.launch
 import com.milesolutions.rewardify.ui.screens.HomeScreen
 import com.milesolutions.rewardify.ui.screens.LoginScreen
+import com.milesolutions.rewardify.ui.screens.PayoutMethodsScreen
 import com.milesolutions.rewardify.ui.screens.ProfileScreen
 import com.milesolutions.rewardify.ui.screens.ReferralScreen
 import com.milesolutions.rewardify.ui.screens.SignupScreen
@@ -88,6 +89,11 @@ fun MainScreen(rootNavController: NavHostController) {
                 )
             }
             composable("wallet") { WalletScreen(tabNavController = tabNavController) }
+            // Payout methods: add/manage USDC wallets and exchange UIDs.
+            // Not a bottom tab — reached from Wallet.
+            composable("payout_methods") {
+                PayoutMethodsScreen(tabNavController = tabNavController)
+            }
             // Referral hub: opened from Profile ("Refer & earn") and the Home
             // promo card. Not a bottom tab — reached via explicit navigation.
             composable("referral") { ReferralScreen(tabNavController = tabNavController) }

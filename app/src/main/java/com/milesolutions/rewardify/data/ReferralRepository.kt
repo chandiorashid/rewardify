@@ -2,7 +2,7 @@ package com.milesolutions.rewardify.data
 
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.buildJsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** Result of making sure the signed-in user has a referral profile. */
@@ -138,6 +138,9 @@ object ReferralRepository {
      * negative 'withdrawal' row into the earnings ledger, so the balance
      * drops and the withdrawal is tracked in Supabase like every other
      * earning event. Throws when the balance doesn't cover [amount].
+     *
+     * Prefer [requestWithdrawal], which additionally creates a tracked
+     * payout request (pending -> paid) against a saved payout method.
      */
     suspend fun recordWithdrawal(amount: Double, note: String) {
         postgrest.rpc(
@@ -147,5 +150,95 @@ object ReferralRepository {
                 put("p_note", note)
             }
         )
+    }
+
+    // ------------------------------------------------------------------
+    // Payout methods & withdrawal requests
+    // ------------------------------------------------------------------
+
+    /** The signed-in user's payout methods, default first, newest next. */
+    suspend fun getMyPayoutMethods(): List<PayoutMethodRow> {
+        val userId = AuthRepository.currentUserId() ?: return emptyList()
+        return postgrest.from("payout_methods").select {
+            filter { eq("user_id", userId) }
+        }.decodeList<PayoutMethodRow>()
+            .sortedWith(
+                compareByDescending<PayoutMethodRow> { it.is_default }
+                    .thenByDescending { it.created_at ?: "" }
+            )
+    }
+
+    /**
+     * Saves a payout method. The first method a user adds automatically
+     * becomes the default.
+     */
+    suspend fun addPayoutMethod(
+        methodType: String,
+        label: String,
+        exchange: String?,
+        accountRef: String,
+        network: String?
+    ): PayoutMethodRow {
+        val userId = AuthRepository.currentUserId()
+            ?: throw IllegalStateException("Not signed in")
+        val makeDefault = getMyPayoutMethods().isEmpty()
+        return postgrest.from("payout_methods")
+            .insert(
+                buildJsonObject {
+                    put("user_id", userId)
+                    put("method_type", methodType)
+                    put("label", label)
+                    put("exchange", exchange)
+                    put("account_ref", accountRef)
+                    put("network", network)
+                    put("is_default", makeDefault)
+                }
+            ) {
+                select()
+            }.decodeSingle<PayoutMethodRow>()
+    }
+
+    /** Deletes one of the signed-in user's payout methods. */
+    suspend fun deletePayoutMethod(id: String) {
+        val userId = AuthRepository.currentUserId() ?: return
+        postgrest.from("payout_methods").delete {
+            filter {
+                eq("id", id)
+                eq("user_id", userId)
+            }
+        }
+    }
+
+    /** Marks one of the user's payout methods as the default. */
+    suspend fun setDefaultPayoutMethod(id: String) {
+        postgrest.rpc(
+            function = "set_default_payout_method",
+            parameters = buildJsonObject { put("p_id", id) }
+        )
+    }
+
+    /** The signed-in user's withdrawal requests, newest first. */
+    suspend fun getMyWithdrawals(): List<WithdrawalRow> {
+        val userId = AuthRepository.currentUserId() ?: return emptyList()
+        return postgrest.from("withdrawals").select {
+            filter { eq("user_id", userId) }
+        }.decodeList<WithdrawalRow>()
+            .sortedByDescending { it.requested_at ?: "" }
+    }
+
+    /**
+     * Requests a withdrawal of [amount] to the given payout method.
+     * Returns the withdrawal id. The server locks the funds immediately and
+     * the request shows as "Pending" until the admin marks it paid in
+     * Supabase (then the app shows "Received").
+     */
+    suspend fun requestWithdrawal(payoutMethodId: String, amount: Double): String {
+        return postgrest.rpc(
+            function = "request_withdrawal",
+            parameters = buildJsonObject {
+                put("p_payout_method_id", payoutMethodId)
+                put("p_amount", amount)
+            }
+        ).decodeSingle<String>()
     }
 }

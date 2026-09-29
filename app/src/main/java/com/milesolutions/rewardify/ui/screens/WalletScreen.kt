@@ -46,12 +46,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.milesolutions.rewardify.data.EarningRow
 import com.milesolutions.rewardify.data.FakeRepository
+import com.milesolutions.rewardify.data.PayoutMethodRow
 import com.milesolutions.rewardify.data.ReferralRepository
 import com.milesolutions.rewardify.data.Transaction
 import com.milesolutions.rewardify.ui.components.RedeemDialog
+import com.milesolutions.rewardify.ui.components.RequestWithdrawDialog
 import com.milesolutions.rewardify.ui.components.SectionTitle
 import com.milesolutions.rewardify.ui.components.TransactionRow
-import com.milesolutions.rewardify.ui.components.WithdrawDialog
 import com.milesolutions.rewardify.ui.components.showToast
 import com.milesolutions.rewardify.ui.theme.Gray100
 import com.milesolutions.rewardify.ui.theme.Gray500
@@ -77,49 +78,74 @@ fun WalletScreen(tabNavController: NavController) {
     // phones and signing back in restores the exact same balance/history.
     var ledgerBalance by remember { mutableStateOf<Double?>(null) }
     var ledgerTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    var payoutMethods by remember { mutableStateOf<List<PayoutMethodRow>>(emptyList()) }
+    var pendingTotal by remember { mutableStateOf(0.0) }
+    var hasRealData by remember { mutableStateOf(false) }
 
     suspend fun refreshLedger() {
-        runCatching { ReferralRepository.getMyEarnings() }.onSuccess { rows ->
-            if (rows.isNotEmpty()) {
-                ledgerBalance = rows.sumOf { it.amount }
-                ledgerTransactions = rows.take(10).map { e ->
-                    Transaction(
-                        id = e.id,
-                        title = earningTitle(e),
-                        date = earningDateLabel(e.created_at),
-                        amount = e.amount
-                    )
-                }
-            }
+        val rows = runCatching { ReferralRepository.getMyEarnings() }
+            .getOrDefault(emptyList())
+        val withdrawals = runCatching { ReferralRepository.getMyWithdrawals() }
+            .getOrDefault(emptyList())
+        payoutMethods = runCatching { ReferralRepository.getMyPayoutMethods() }
+            .getOrDefault(emptyList())
+        pendingTotal = withdrawals
+            .filter { it.status == "pending" }
+            .sumOf { it.amount }
+        hasRealData = rows.isNotEmpty() || withdrawals.isNotEmpty()
+        if (rows.isNotEmpty()) {
+            ledgerBalance = rows.sumOf { it.amount }
         }
+        // Withdrawals carry their payout status (Pending -> Received), so
+        // they replace the raw negative ledger rows in the history list.
+        val merged = mutableListOf<Pair<String, Transaction>>()
+        withdrawals.forEach { w ->
+            merged += (w.requested_at ?: "") to Transaction(
+                id = "w_${w.id}",
+                title = "Withdrawal to ${w.method_label}",
+                date = earningDateLabel(w.requested_at),
+                amount = -w.amount,
+                status = w.status
+            )
+        }
+        rows.filter { it.source != "withdrawal" }.forEach { e ->
+            merged += (e.created_at ?: "") to Transaction(
+                id = e.id,
+                title = earningTitle(e),
+                date = earningDateLabel(e.created_at),
+                amount = e.amount
+            )
+        }
+        ledgerTransactions = merged
+            .sortedByDescending { it.first }
+            .map { it.second }
+            .take(10)
     }
     LaunchedEffect(Unit) { refreshLedger() }
     val displayBalance = ledgerBalance ?: FakeRepository.availableBalance
     val displayLifetime = ledgerBalance ?: FakeRepository.lifetimeEarned
+    val displayPending =
+        if (hasRealData) pendingTotal else FakeRepository.pendingBalance
     val displayTransactions =
         if (ledgerTransactions.isNotEmpty()) ledgerTransactions
         else FakeRepository.transactions
 
     if (showWithdraw) {
-        WithdrawDialog(
+        RequestWithdrawDialog(
             availableBalance = displayBalance,
+            methods = payoutMethods,
             onDismiss = { showWithdraw = false },
-            onConfirm = { amount ->
+            onConfirm = { methodId, amount ->
                 showWithdraw = false
                 scope.launch {
                     isWithdrawing = true
                     val result = runCatching {
-                        ReferralRepository.recordWithdrawal(
-                            amount,
-                            "Withdrawal requested from wallet"
-                        )
+                        ReferralRepository.requestWithdrawal(methodId, amount)
                     }
                     isWithdrawing = false
                     result
                         .onSuccess {
-                            context.showToast(
-                                "Withdrawal of $${"%.2f".format(amount)} recorded ✓"
-                            )
+                            context.showToast("Withdrawal requested — pending ⏳")
                             refreshLedger()
                         }
                         .onFailure { e ->
@@ -208,7 +234,7 @@ fun WalletScreen(tabNavController: NavController) {
                         ) {
                             BalanceStat(
                                 label = "Pending",
-                                value = "$${"%.2f".format(FakeRepository.pendingBalance)}"
+                                value = "$${"%.2f".format(displayPending)}"
                             )
                             BalanceStat(
                                 label = "Lifetime earned",
@@ -221,7 +247,14 @@ fun WalletScreen(tabNavController: NavController) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White)
-                                .clickable(enabled = !isWithdrawing) { showWithdraw = true }
+                                .clickable(enabled = !isWithdrawing) {
+                                    if (payoutMethods.isEmpty()) {
+                                        context.showToast("Add a payout method first")
+                                        tabNavController.navigate("payout_methods")
+                                    } else {
+                                        showWithdraw = true
+                                    }
+                                }
                                 .padding(vertical = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -247,10 +280,7 @@ fun WalletScreen(tabNavController: NavController) {
                 WalletActionCard(
                     label = "Add payout method",
                     icon = Icons.Filled.AccountBalance,
-                    onClick = {
-                        // TODO: open payout-method screen
-                        context.showToast("Payout methods coming soon")
-                    },
+                    onClick = { tabNavController.navigate("payout_methods") },
                     modifier = Modifier.weight(1f)
                 )
                 WalletActionCard(

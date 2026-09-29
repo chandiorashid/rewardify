@@ -24,7 +24,9 @@ data class Transaction(
     val id: String,
     val title: String,
     val date: String,
-    val amount: Double
+    val amount: Double,
+    /** Withdrawal payout status: "pending" | "paid" | "rejected", null for credits. */
+    val status: String? = null
 )
 
 /** Earning category shown on the Home grid. */

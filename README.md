@@ -96,6 +96,38 @@ database tables/functions. This is a one-time, one-minute step:
    contents, paste into the query editor and press **Run**.
 3. Done — no errors means the backend is live.
 
+## Payouts & withdrawals setup
+
+Withdrawals support two payout rails: **USDC** (wallet address + network) and
+**exchange UIDs** (Binance, OKX, Bybit, …). The backend for this is
+`supabase/payout_schema.sql` — already deployed; run it in the SQL Editor only
+if you're setting up a fresh project.
+
+How it works:
+
+- **Payout methods screen** (Wallet → "Add payout method"): users save a USDC
+  wallet (address + network: Solana, Ethereum, Polygon, …) and/or exchange
+  accounts (exchange + UID). Tap a method to make it the default; the first one
+  added becomes the default automatically.
+- **Requesting a withdrawal:** Wallet → Withdraw (Home's Withdraw button jumps
+  to Wallet) → pick a payout method → enter an amount (min $5.00). If the user
+  has no payout method yet, the app sends them to add one first.
+- The server locks the funds **immediately** (negative `withdrawal` ledger row,
+  balance drops, $5 minimum and sufficient-balance enforced server-side) and
+  creates a `withdrawals` row with status **pending**. The app history shows it
+  with a gold **Pending** badge, and the Wallet "Pending" stat shows the real
+  pending total.
+- **Paying out (admin):** open the Supabase dashboard → Table Editor →
+  `withdrawals`. Each pending row shows the amount and exactly where to send it
+  (`method_label`, `account_ref`, `exchange`/`network`). Send the money manually
+  (USDC transfer or exchange internal transfer to the UID), then edit the row:
+  set `status` to `paid` (and optionally `decided_at` = now, `admin_note`).
+- On next open, the app shows that withdrawal with a green **Received** badge.
+  Rejected payouts can be marked `rejected` (red badge).
+- Everything is server-side (profiles, ledger, payout methods, withdrawals), so
+  logout / reinstall / new phone + sign-in restores balance, methods and the
+  full pending/paid history.
+
 How it works:
 
 - **Every user gets a unique referral code**, generated server-side on first
@@ -115,10 +147,11 @@ How it works:
 - **Completing a task** now records a real earning: tap a task → Start →
   confirm "Complete task?" → the amount is logged and the referrer's 5% is
   paid instantly.
-- **Withdrawals are tracked too:** confirming a withdrawal writes a negative
-  `withdrawal` row into the same ledger (via `supabase/withdrawal_schema.sql`),
-  so the balance drops and the withdrawal shows in Supabase and in the app's
-  transaction history. The server refuses withdrawals above the balance.
+- **Withdrawals are tracked too:** requesting a withdrawal locks the funds with
+  a negative `withdrawal` ledger row (via `supabase/payout_schema.sql`) and
+  creates a `withdrawals` row with status **pending**; marking it `paid` in the
+  Supabase Table Editor flips the app history to **Received**. See "Payouts &
+  withdrawals setup" above.
 - The Wallet balance and Recent transactions read from the real ledger once
   earnings exist (demo values are shown until then).
 - **Everything is server-side:** the ledger lives in Supabase keyed by account,
@@ -130,9 +163,12 @@ How it works:
 - **Login/Signup validation** — empty-field, email-format, password-length and
   password-match checks with toast feedback; forgot-password and social buttons
   show contextual toasts.
-- **Withdraw dialog** — amount entry with validation (valid number, $5.00 minimum,
-  sufficient balance); confirming writes a real `withdrawal` entry to the
-  Supabase earnings ledger and refreshes the balance. Available on Home and Wallet.
+- **Withdraw dialog** — payout-method picker (USDC / exchange UID) plus amount
+  entry with validation (valid number, $5.00 minimum, sufficient balance);
+  confirming calls `request_withdrawal`, which locks the funds server-side and
+  creates a **Pending** withdrawal; history badges flip to **Received** once the
+  admin marks it paid in Supabase. Lives in Wallet (Home's Withdraw button
+  jumps to Wallet).
 - **Gift-card redemption dialog** — code validation with a success toast.
 - **Tasks** — category tabs filter the list; tapping a Home category tile opens
   Tasks pre-filtered to that category; confirming "Complete task?" records a
@@ -147,5 +183,5 @@ How it works:
   ledger (including withdrawals) are real — the SQL files in `supabase/` are
   already deployed. Task catalog content itself is still sample data.
 - **TODO markers** in the code flag the natural next steps: task details,
-  payout methods, notifications, search/filters, settings.
+  notifications, search/filters, settings.
 - Social buttons (Google/Apple) are UI placeholders — connect real OAuth later.

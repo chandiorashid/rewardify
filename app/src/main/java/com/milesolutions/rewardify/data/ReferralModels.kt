@@ -34,3 +34,43 @@ data class EarningRow(
     val note: String? = null,
     val created_at: String? = null
 )
+
+/**
+ * Row from public.payout_methods — a saved payout destination.
+ * method_type: "usdc" (account_ref = wallet address, network set) |
+ *              "exchange" (exchange = binance/okx/..., account_ref = UID)
+ */
+@Serializable
+data class PayoutMethodRow(
+    val id: String,
+    val user_id: String,
+    val method_type: String,
+    val label: String,
+    val exchange: String? = null,
+    val account_ref: String,
+    val network: String? = null,
+    val is_default: Boolean = false,
+    val created_at: String? = null
+)
+
+/**
+ * Row from public.withdrawals — a withdrawal request and its payout status.
+ * status: "pending" (user sees Pending) | "paid" (user sees Received) |
+ *         "rejected"
+ */
+@Serializable
+data class WithdrawalRow(
+    val id: String,
+    val user_id: String,
+    val payout_method_id: String? = null,
+    val amount: Double,
+    val method_type: String,
+    val method_label: String,
+    val account_ref: String,
+    val exchange: String? = null,
+    val network: String? = null,
+    val status: String,
+    val admin_note: String? = null,
+    val requested_at: String? = null,
+    val decided_at: String? = null
+)
