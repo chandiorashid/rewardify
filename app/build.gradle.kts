@@ -49,7 +49,7 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    val composeBom = platform("androidx.compose:compose-bom:2025.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
@@ -73,6 +73,11 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
+    // Ktor HTTP engine (required): Supabase 3.x is built on Ktor, and Ktor
+    // ships without a default engine. Without this, the app crashes on
+    // launch with "Failed to find HTTP client engine implementation".
+    // 3.5.1 matches the Ktor version the Supabase 3.8.0 BOM resolves.
+    implementation("io.ktor:ktor-client-okhttp:3.5.1")
 
     // Google Mobile Ads (rewarded ads). Version pinned to a known-good
     // release — bump deliberately, then re-test ad loading.
