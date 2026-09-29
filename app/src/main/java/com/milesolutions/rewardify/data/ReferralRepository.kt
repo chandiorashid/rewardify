@@ -281,7 +281,9 @@ object ReferralRepository {
         require(images.isNotEmpty()) { "Add at least one screenshot" }
         val paths = images.mapIndexed { index, bytes ->
             val path = "$userId/${System.currentTimeMillis()}_$index.jpg"
-            storage.from("task-proofs").upload(path, bytes, upsert = false)
+            storage.from("task-proofs").upload(path, bytes) {
+                upsert = false
+            }
             path
         }
         return postgrest.from("task_submissions")

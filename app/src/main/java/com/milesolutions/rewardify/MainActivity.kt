@@ -27,7 +27,7 @@ import com.milesolutions.rewardify.ui.screens.SplashScreen
 import com.milesolutions.rewardify.ui.theme.RewardifyTheme
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.handleDeeplinks
+import io.github.jan.supabase.auth.parseFragmentAndImportSession
 import io.github.jan.supabase.auth.status.SessionStatus
 
 class MainActivity : ComponentActivity() {
@@ -63,15 +63,19 @@ class MainActivity : ComponentActivity() {
         val uri = intent?.data ?: return
         if (uri.scheme != Supabase.AUTH_SCHEME || !SupabaseConfig.isConfigured) return
         when (uri.host) {
-            Supabase.AUTH_HOST -> Supabase.client.handleDeeplinks(
-                intent,
-                onSessionSuccess = {
-                    showToast("Email verified — welcome to Rewardify! 🎉")
-                },
-                onError = { error ->
-                    showToast(error.message ?: "Could not verify your email. Please try again.")
+            Supabase.AUTH_HOST -> {
+                // Supabase 3.x removed the old handleDeeplinks helper; parse
+                // the fragment (#access_token=...) and import the session
+                // directly. The sessionStatus flow below navigates on success.
+                val fragment = uri.fragment ?: uri.encodedFragment ?: return
+                Supabase.client.auth.parseFragmentAndImportSession(fragment) { session ->
+                    if (session != null) {
+                        showToast("Email verified — welcome to Rewardify! 🎉")
+                    } else {
+                        showToast("Could not verify your email. Please try again.")
+                    }
                 }
-            )
+            }
 
             Supabase.REFERRAL_HOST -> {
                 val code = uri.getQueryParameter("code")?.trim().orEmpty()
