@@ -145,6 +145,30 @@ Never tap your own real ads during development — keep the sample ids (or use
 AdMob test devices) until release, or AdMob may flag the account for invalid
 activity.
 
+### Meta Audience Network mediation (bidding)
+
+The Meta mediation adapter (`com.google.ads.mediation:facebook:6.19.0.0`) is
+already bundled in the app — 6.19.0.0 is the newest adapter built and tested
+with the project's AdMob SDK (23.6.0); newer adapters need AdMob 24+, so don't
+bump it alone. Mediation needs **no code changes** — it is configured
+server-side:
+
+1. **Meta side** — [Meta Monetization Manager](https://business.facebook.com):
+   create/select your business → create the app → create a **Rewarded**
+   placement → copy the **Placement ID**.
+2. **AdMob side** — dashboard → Mediation → create a mediation group for the
+   rewarded ad unit → add **Meta Audience Network** as a **bidding** ad source
+   → paste the Placement ID → Save. (Meta no longer supports waterfall, only
+   bidding.)
+3. **Test IDs** — Meta publishes no universal sample placement IDs. To test:
+   register your phone as a test device in Meta's Monetization Manager, then
+   load ads with your real placement IDs — test devices get Meta test ads.
+   The AdMob sample ad unit in the app keeps serving Google test ads meanwhile.
+
+When you later replace the AdMob sample ids with real ones (steps 1–3 of the
+section above), Meta bidding starts competing for the same rewarded ad unit
+automatically — nothing to change in the app.
+
 ## Install & earn offers (screenshot proof + manual approval)
 
 The Tasks screen also lists **install offers** — admin-managed tasks where a

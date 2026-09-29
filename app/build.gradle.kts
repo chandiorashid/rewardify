@@ -76,6 +76,13 @@ dependencies {
     // Google Mobile Ads (rewarded ads). Version pinned to a known-good
     // release — bump deliberately, then re-test ad loading.
     implementation("com.google.android.gms:play-services-ads:23.6.0")
+    // Meta Audience Network mediation adapter. Version 6.19.0.0 is the
+    // newest adapter built AND tested with GMA 23.6.0 (per Google's
+    // changelog); 6.19.0.1+ requires GMA 24.0.0+, so don't bump this
+    // without also bumping play-services-ads. Pulls the FAN SDK
+    // transitively. Mediation itself is configured server-side in the
+    // AdMob dashboard (mediation group), not in code.
+    implementation("com.google.ads.mediation:facebook:6.19.0.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

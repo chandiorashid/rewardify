@@ -14,6 +14,20 @@ package com.milesolutions.rewardify.data
  * Never tap your own real ads during development — keep the sample ids (or
  * use test devices) until release, or AdMob may flag the account for
  * invalid activity.
+ *
+ * META AUDIENCE NETWORK MEDIATION (bidding):
+ * The Meta mediation adapter is bundled via Gradle
+ * (com.google.ads.mediation:facebook) — no code changes are needed for it.
+ * Meta placement ids are NOT placed in code; they are entered server-side:
+ *  1. Meta Monetization Manager (business.facebook.com): create the app and
+ *     a Rewarded placement -> copy the Placement ID.
+ *  2. AdMob dashboard -> Mediation -> create a mediation group for the
+ *     rewarded ad unit above -> add "Meta Audience Network" as a BIDDING
+ *     ad source -> paste the Placement ID.
+ *  3. Testing Meta ads: Meta has no universal sample placement ids. Instead,
+ *     register your device as a test device in Meta's Monetization Manager
+ *     (or use AdMob test-device mode) — test devices receive Meta test ads
+ *     on your real placement ids.
  */
 object AdsConfig {
     /** Sample id — replace with the real AdMob app id before release. */
