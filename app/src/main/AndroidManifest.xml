@@ -9,7 +9,7 @@
         android:label="Rewardify"
         android:supportsRtl="true"
         android:theme="@style/Theme.Rewardify"
-        tools:targetApi="34">
+        tools:targetApi="36">
         <!-- AdMob app id. Sample id below — replace with the real id from the
              AdMob dashboard before release (keep in sync with AdsConfig.APP_ID). -->
         <meta-data

@@ -7,7 +7,10 @@ plugins {
 
 android {
     namespace = "com.milesolutions.rewardify"
-    compileSdk = 34
+    // compileSdk 36: required by AndroidX libraries pulled in transitively
+    // by the ads SDKs (browser 1.10.0, compose 1.9.0, ...). targetSdk stays
+    // 34 on purpose — raising compileSdk alone changes no runtime behavior.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.milesolutions.rewardify"
