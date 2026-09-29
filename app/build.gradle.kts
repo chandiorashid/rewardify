@@ -66,11 +66,16 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.0")
 
-    // Supabase (auth + database)
+    // Supabase (auth + database + storage)
     val supabaseBom = platform("io.github.jan-tennert.supabase:bom:3.8.0")
     implementation(supabaseBom)
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
+
+    // Google Mobile Ads (rewarded ads). Version pinned to a known-good
+    // release — bump deliberately, then re-test ad loading.
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

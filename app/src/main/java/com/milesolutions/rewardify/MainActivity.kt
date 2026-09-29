@@ -19,6 +19,7 @@ import com.milesolutions.rewardify.data.ReferralPrefs
 import com.milesolutions.rewardify.data.ReferralRepository
 import com.milesolutions.rewardify.data.Supabase
 import com.milesolutions.rewardify.data.SupabaseConfig
+import com.google.android.gms.ads.MobileAds
 import com.milesolutions.rewardify.ui.components.showToast
 import com.milesolutions.rewardify.ui.navigation.AuthNavHost
 import com.milesolutions.rewardify.ui.navigation.MainRoot
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Rewarded ads (Tasks screen). Safe to call before any ad load.
+        MobileAds.initialize(this) {}
         // Cold start via a deep link (email confirmation or referral link).
         handleDeepLink(intent)
         setContent {

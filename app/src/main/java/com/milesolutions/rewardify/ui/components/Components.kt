@@ -357,6 +357,7 @@ fun TransactionRow(tx: Transaction, modifier: Modifier = Modifier) {
 fun WithdrawalStatusPill(status: String) {
     val (bg, fg, label) = when (status) {
         "paid" -> Triple(Emerald100, Emerald700, "Received")
+        "approved" -> Triple(Emerald100, Emerald700, "Approved")
         "rejected" -> Triple(Danger100, Danger500, "Rejected")
         else -> Triple(Gold500.copy(alpha = 0.16f), Gold600, "Pending")
     }

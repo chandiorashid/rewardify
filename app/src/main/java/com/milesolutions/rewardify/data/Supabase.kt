@@ -3,6 +3,7 @@ package com.milesolutions.rewardify.data
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.storage.Storage
 
 /**
  * Shared Supabase client (Auth plugin installed). Created lazily on first use.
@@ -45,6 +46,7 @@ object Supabase {
                 defaultRedirectUrl = AUTH_REDIRECT_URL
             }
             install(Postgrest)
+            install(Storage)
         }
     }
 }

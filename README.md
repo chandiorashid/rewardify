@@ -123,6 +123,55 @@ How it works:
   (USDC transfer or exchange internal transfer to the UID), then edit the row:
   set `status` to `paid` (and optionally `decided_at` = now, `admin_note`).
 - On next open, the app shows that withdrawal with a green **Received** badge.
+
+## Rewarded ads setup (AdMob)
+
+The Tasks screen has a **Watch Ad** card: each fully-watched rewarded ad grants
+one of **$0.02 / $0.018 / $0.021 at random**, written straight into the Supabase
+earnings ledger (with the usual 5% lifetime commission to the referrer).
+
+The app ships with **Google's official sample ad ids**, so ads work in test mode
+out of the box. Before release:
+
+1. Create an [AdMob](https://admob.google.com) account, register the Android
+   app, and create a **Rewarded** ad unit.
+2. In `app/src/main/java/com/milesolutions/rewardify/data/AdsConfig.kt`:
+   replace `APP_ID` and `REWARDED_AD_UNIT_ID` with your real ids.
+3. In `app/src/main/AndroidManifest.xml`: replace the
+   `com.google.android.gms.ads.APPLICATION_ID` meta-data value with the same
+   real app id (keep it in sync with `AdsConfig.APP_ID`).
+
+Never tap your own real ads during development — keep the sample ids (or use
+AdMob test devices) until release, or AdMob may flag the account for invalid
+activity.
+
+## Install & earn offers (screenshot proof + manual approval)
+
+The Tasks screen also lists **install offers** — admin-managed tasks where a
+user installs an app from the Play Store, uses it ~2 minutes, and submits
+screenshots as proof. You review and approve manually; on approval the **$0.08**
+reward is credited automatically (plus 5% to the referrer). The backend is
+`supabase/task_submissions_schema.sql` — already deployed.
+
+How it works:
+
+- **Adding an offer (admin):** Supabase dashboard → Table Editor →
+  `install_offers` → Insert row: `app_name`, `package_name`, `store_url`
+  (full Play Store link), `reward` (default 0.08), `instructions`, `is_active`
+  = true. It appears in the app immediately — no app update needed.
+- **User flow:** Tasks → "Install & earn" → tap an offer → "Open Play Store"
+  → install & use the app → "Submit screenshots" → pick up to 5 screenshots
+  (installed app, screens visited) → uploads to the private `task-proofs`
+  bucket and files a **pending** submission.
+- **Reviewing (admin):** Table Editor → `task_submissions` shows each pending
+  row with its screenshot paths; open the images in Storage → `task-proofs` →
+  `<user-id>/`. Set `status` to `approved` (or `rejected` with an `admin_note`).
+- On **approved**, a trigger credits the offer's reward to the user instantly
+  — the app shows a green **Approved** badge in "My submissions" and the $0.08
+  lands in their wallet. The trigger only fires on the pending → approved
+  transition, so re-editing can never double-pay.
+- Users can only ever see/file their **own** submissions; screenshots live in
+  a private bucket (one folder per user).
   Rejected payouts can be marked `rejected` (red badge).
 - Everything is server-side (profiles, ledger, payout methods, withdrawals), so
   logout / reinstall / new phone + sign-in restores balance, methods and the

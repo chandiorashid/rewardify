@@ -1,5 +1,8 @@
 package com.milesolutions.rewardify.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,11 +42,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import android.app.Activity
+import android.content.Intent
+import androidx.core.net.toUri
+import com.milesolutions.rewardify.data.AdsConfig
 import com.milesolutions.rewardify.data.FakeRepository
+import com.milesolutions.rewardify.data.InstallOfferRow
 import com.milesolutions.rewardify.data.ReferralRepository
+import com.milesolutions.rewardify.data.RewardedAdManager
 import com.milesolutions.rewardify.data.TaskCategory
 import com.milesolutions.rewardify.data.TaskItem
+import com.milesolutions.rewardify.data.TaskSubmissionRow
+import com.milesolutions.rewardify.ui.components.InstallOfferCard
+import com.milesolutions.rewardify.ui.components.OfferDetailDialog
+import com.milesolutions.rewardify.ui.components.SectionTitle
+import com.milesolutions.rewardify.ui.components.SubmissionRow
 import com.milesolutions.rewardify.ui.components.TaskCard
+import com.milesolutions.rewardify.ui.components.WatchAdCard
 import com.milesolutions.rewardify.ui.components.showToast
 import com.milesolutions.rewardify.ui.theme.Gray500
 import com.milesolutions.rewardify.ui.theme.Gray900
@@ -65,6 +81,111 @@ fun TasksScreen(
     // in the ledger — and automatically pays 5% to the user's referrer.
     var pendingTask by remember { mutableStateOf<TaskItem?>(null) }
     var recording by remember { mutableStateOf(false) }
+
+    // ---- Rewarded ads --------------------------------------------------
+    // One of $0.02 / $0.018 / $0.021 is granted at random for each
+    // fully-watched ad. The earning lands in the Supabase ledger (with the
+    // usual 5% lifetime commission to the user's referrer).
+    var adReady by remember { mutableStateOf(RewardedAdManager.isReady) }
+    var adBusy by remember { mutableStateOf(false) }
+
+    fun watchAd() {
+        val activity = context as? Activity
+        if (activity == null) {
+            context.showToast("Couldn't open the ad — try again")
+            return
+        }
+        if (!RewardedAdManager.isReady) {
+            context.showToast("Ad is loading — one moment…")
+            RewardedAdManager.load(context) { ready -> adReady = ready }
+            return
+        }
+        adBusy = true
+        RewardedAdManager.show(
+            activity = activity,
+            onReward = {
+                val reward = AdsConfig.AD_REWARDS.random()
+                scope.launch {
+                    val ok = runCatching {
+                        ReferralRepository.recordTaskEarning(
+                            reward,
+                            "Rewarded ad watched"
+                        )
+                    }.isSuccess
+                    context.showToast(
+                        if (ok) "Earned $${"%.3f".format(reward)}! 🎬"
+                        else "Couldn't save the reward — check your connection"
+                    )
+                }
+            },
+            onFinished = {
+                adBusy = false
+                adReady = false
+                RewardedAdManager.load(context) { ready -> adReady = ready }
+            }
+        )
+    }
+
+    // ---- Install offers ------------------------------------------------
+    var offers by remember { mutableStateOf<List<InstallOfferRow>>(emptyList()) }
+    var submissions by remember { mutableStateOf<List<TaskSubmissionRow>>(emptyList()) }
+    var detailOffer by remember { mutableStateOf<InstallOfferRow?>(null) }
+    var submitting by remember { mutableStateOf(false) }
+
+    fun refreshOffers() {
+        scope.launch {
+            runCatching { ReferralRepository.getActiveInstallOffers() }
+                .onSuccess { offers = it }
+            runCatching { ReferralRepository.getMySubmissions() }
+                .onSuccess { submissions = it }
+        }
+    }
+
+    // Offer waiting for the user to pick screenshots.
+    var proofOffer by remember { mutableStateOf<InstallOfferRow?>(null) }
+    val pickImages = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(5)
+    ) { uris ->
+        val offer = proofOffer
+        proofOffer = null
+        if (offer == null || uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            submitting = true
+            val result = runCatching {
+                val bytes = uris.take(5).map { uri ->
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IllegalStateException("Couldn't read a screenshot")
+                }
+                ReferralRepository.submitOfferProof(offer.id, bytes)
+            }
+            submitting = false
+            result
+                .onSuccess {
+                    context.showToast("Proof submitted — pending review ✓")
+                    refreshOffers()
+                }
+                .onFailure { e ->
+                    context.showToast(
+                        "Submit failed: ${e.message?.take(80) ?: "try again"}"
+                    )
+                }
+        }
+    }
+
+    fun openStore(offer: InstallOfferRow) {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, offer.store_url.toUri())
+            )
+        }.onFailure {
+            context.showToast("Couldn't open the Play Store link")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        RewardedAdManager.load(context) { ready -> adReady = ready }
+        refreshOffers()
+    }
 
     pendingTask?.let { task ->
         AlertDialog(
@@ -164,13 +285,65 @@ fun TasksScreen(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Rewarded ad: watch a short ad, earn $0.018–$0.021 at random.
+            item {
+                WatchAdCard(
+                    adReady = adReady,
+                    adBusy = adBusy,
+                    onWatch = ::watchAd
+                )
+            }
+
             items(visibleTasks, key = { it.id }) { task ->
                 TaskCard(
                     task = task,
                     onStart = { pendingTask = task }
                 )
             }
+
+            // Install & earn offers (admin-managed in Supabase).
+            if (offers.isNotEmpty()) {
+                item { SectionTitle("Install & earn") }
+                items(offers, key = { it.id }) { offer ->
+                    InstallOfferCard(
+                        offer = offer,
+                        submission = submissions.firstOrNull { it.offer_id == offer.id },
+                        onClick = { detailOffer = offer }
+                    )
+                }
+            }
+
+            // Filed submissions and their review status.
+            if (submissions.isNotEmpty()) {
+                item { SectionTitle("My submissions") }
+                items(submissions, key = { it.id }) { submission ->
+                    SubmissionRow(
+                        submission = submission,
+                        offerName = offers.firstOrNull { it.id == submission.offer_id }?.app_name
+                            ?: "Install offer"
+                    )
+                }
+            }
             item { Spacer(modifier = Modifier.height(12.dp)) }
+        }
+
+        // Install-offer details / proof submission.
+        detailOffer?.let { offer ->
+            OfferDetailDialog(
+                offer = offer,
+                submitting = submitting,
+                onDismiss = { if (!submitting) detailOffer = null },
+                onOpenStore = { openStore(offer) },
+                onSubmitProof = {
+                    detailOffer = null
+                    proofOffer = offer
+                    pickImages.launch(
+                        PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                }
+            )
         }
     }
 }

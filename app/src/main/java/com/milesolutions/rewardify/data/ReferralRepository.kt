@@ -2,6 +2,9 @@ package com.milesolutions.rewardify.data
 
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -40,6 +43,7 @@ object ReferralRepository {
     const val COMMISSION_RATE = 0.05
 
     private val postgrest get() = Supabase.client.postgrest
+    private val storage get() = Supabase.client.storage
 
     /**
      * Ensures the signed-in user has a profile row (and therefore a referral
@@ -240,5 +244,58 @@ object ReferralRepository {
                 put("p_amount", amount)
             }
         ).decodeSingle<String>()
+    }
+
+    // ------------------------------------------------------------------
+    // Install-offer tasks (screenshot proof + manual approval)
+    // ------------------------------------------------------------------
+
+    /** Active install offers, newest first. */
+    suspend fun getActiveInstallOffers(): List<InstallOfferRow> {
+        return postgrest.from("install_offers").select {
+            filter { eq("is_active", true) }
+        }.decodeList<InstallOfferRow>()
+            .sortedByDescending { it.created_at ?: "" }
+    }
+
+    /** The signed-in user's offer submissions, newest first. */
+    suspend fun getMySubmissions(): List<TaskSubmissionRow> {
+        val userId = AuthRepository.currentUserId() ?: return emptyList()
+        return postgrest.from("task_submissions").select {
+            filter { eq("user_id", userId) }
+        }.decodeList<TaskSubmissionRow>()
+            .sortedByDescending { it.submitted_at ?: "" }
+    }
+
+    /**
+     * Uploads screenshot proof to private storage and files the submission
+     * as pending. Returns the created row. [images] are JPEG bytes
+     * (screenshots of the installed app and the screens visited).
+     */
+    suspend fun submitOfferProof(
+        offerId: String,
+        images: List<ByteArray>
+    ): TaskSubmissionRow {
+        val userId = AuthRepository.currentUserId()
+            ?: throw IllegalStateException("Not signed in")
+        require(images.isNotEmpty()) { "Add at least one screenshot" }
+        val paths = images.mapIndexed { index, bytes ->
+            val path = "$userId/${System.currentTimeMillis()}_$index.jpg"
+            storage.from("task-proofs").upload(path, bytes, upsert = false)
+            path
+        }
+        return postgrest.from("task_submissions")
+            .insert(
+                buildJsonObject {
+                    put("user_id", userId)
+                    put("offer_id", offerId)
+                    put(
+                        "screenshot_urls",
+                        JsonArray(paths.map { JsonPrimitive(it) })
+                    )
+                }
+            ) {
+                select()
+            }.decodeSingle<TaskSubmissionRow>()
     }
 }

@@ -54,6 +54,37 @@ data class PayoutMethodRow(
 )
 
 /**
+ * Row from public.install_offers — an admin-managed "install & try" task.
+ */
+@Serializable
+data class InstallOfferRow(
+    val id: String,
+    val app_name: String,
+    val package_name: String,
+    val store_url: String,
+    val reward: Double = 0.08,
+    val instructions: String? = null,
+    val is_active: Boolean = true,
+    val created_at: String? = null
+)
+
+/**
+ * Row from public.task_submissions — screenshot proof filed by a user.
+ * status: "pending" | "approved" (reward auto-credited) | "rejected"
+ */
+@Serializable
+data class TaskSubmissionRow(
+    val id: String,
+    val user_id: String,
+    val offer_id: String,
+    val screenshot_urls: List<String> = emptyList(),
+    val status: String,
+    val admin_note: String? = null,
+    val submitted_at: String? = null,
+    val decided_at: String? = null
+)
+
+/**
  * Row from public.withdrawals — a withdrawal request and its payout status.
  * status: "pending" (user sees Pending) | "paid" (user sees Received) |
  *         "rejected"
